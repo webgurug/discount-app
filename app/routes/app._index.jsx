@@ -17,7 +17,8 @@ import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
-
+  const shopify = await authenticate.admin(request);
+  await createFunction(shopify);
   return null;
 };
 
@@ -325,4 +326,55 @@ export default function Index() {
       </BlockStack>
     </Page>
   );
+}
+
+export async function createFunction(shopify) {
+  const query = `
+  query {
+    shopifyFunctions(first: 50) {
+      edges {
+        node {
+        app{
+        title
+        }
+        id
+        title
+        apiType
+        }
+      }
+    }
+  }
+`;
+  const response = await shopify.admin.graphql(query);
+  const json = await response.json();
+  const productDiscountFunction = json?.data?.shopifyFunctions?.edges.find(
+    (edge) => edge.node.apiType === "product_discounts",
+  )?.node;
+
+  if (productDiscountFunction) {
+    const createAutomaticDiscountMutation = `#graphql
+  mutation discountAutomaticAppCreate($automaticAppDiscount: DiscountAutomaticAppInput!) {
+    discountAutomaticAppCreate(automaticAppDiscount: $automaticAppDiscount) {
+      automaticAppDiscount {
+        discountId
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+    const variables = {
+      automaticAppDiscount: {
+        title: "Automatic Discount Sale",
+        functionId: productDiscountFunction.id,
+        startsAt: "2025-04-01T00:00:00",
+      },
+    };
+    await shopify.admin.graphql(createAutomaticDiscountMutation, {
+      variables,
+    });
+  }
 }
