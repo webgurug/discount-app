@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Discount` ADD COLUMN `storeUrl` VARCHAR(191) NOT NULL DEFAULT '';

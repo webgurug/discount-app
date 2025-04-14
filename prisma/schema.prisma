@@ -41,6 +41,7 @@ model Discount {
   quantity    Int
   percentage  Float
   saleMessage String
+  storeUrl    String @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

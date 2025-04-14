@@ -16,6 +16,7 @@ import { TitleBar } from "@shopify/app-bridge-react"; // Import TitleBar from ap
 import { prisma } from '../lib/prisma';
 import { useActionData, Form, useNavigation } from "@remix-run/react";
 import { Banner } from "@shopify/polaris";
+import { addVariantMetafield } from "./app.create_function";
 //import { json } from '@remix-run/node';
 //import { LinksFunction, json } from '@remix-run/node';
 // Loader to fetch all products
@@ -41,6 +42,7 @@ export async function loader({ request }) {
 }
 //// Save Information ////
 export async function action({ request }) {
+  const shopify = await authenticate.admin(request);
   const formData = await request.formData();
 
   const productId = formData.get("productId");
@@ -62,6 +64,16 @@ export async function action({ request }) {
   }
 
   try {
+    const discountData = [
+      {
+        productId,
+        variantId,
+        quantity,
+        percentage,
+        saleMessage,
+      },
+    ];
+    await addVariantMetafield(shopify, discountData);
     await prisma.discount.create({
       data: {
         productId,
@@ -69,6 +81,7 @@ export async function action({ request }) {
         quantity,
         percentage,
         saleMessage,
+        storeUrl: shopify.session.shop,
       },
     });
 
