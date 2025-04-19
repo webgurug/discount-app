@@ -71,3 +71,42 @@
     padding-bottom: 1rem;
   }
 }
+
+.showModal2Div {
+  position: fixed;
+  top: 5px;
+  right: 20px;
+  background-color: #f4f6f8;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 300px;
+}
+
+.showModal2DivInner1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2px 16px 0px 16px;
+}
+
+.customXIcon {
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+}
+
+
+.showModal2DivInner2 {
+  display: flex;
+  align-items: center;
+  padding-bottom: 5px;
+  padding: 0px 16px 2px 16px;
+  gap: 10px;
+}

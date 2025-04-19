@@ -1,380 +1,260 @@
-import { useEffect } from "react";
-import { useFetcher } from "@remix-run/react";
 import {
   Page,
   Layout,
-  Text,
   Card,
-  Button,
   BlockStack,
-  Box,
-  List,
-  Link,
-  InlineStack,
+  Frame,
+  Toast,
+  Select,
 } from "@shopify/polaris";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { useState, useEffect, useRef } from "react";
+import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { useLoaderData, useFetcher } from "@remix-run/react";
+import { createFunction, addVariantMetafield } from "./app.helpers";
+import { prismaCreateDiscount, prismafindFirst } from "./app.prismaHandler";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
   const shopify = await authenticate.admin(request);
   await createFunction(shopify);
-  return null;
-};
-
-export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
+  const query = `
+    query {
+      products(first: 50) {
+        edges {
+          node {
             id
             title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
           }
         }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
-  const product = responseJson.data.productCreate.product;
-  const variantId = product.variants.edges[0].node.id;
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyRemixTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-  const variantResponseJson = await variantResponse.json();
-
-  return {
-    product: responseJson.data.productCreate.product,
-    variant: variantResponseJson.data.productVariantsBulkUpdate.productVariants,
-  };
-};
-
-export default function Index() {
-  const fetcher = useFetcher();
-  const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
-  const productId = fetcher.data?.product?.id.replace(
-    "gid://shopify/Product/",
-    "",
-  );
-
-  useEffect(() => {
-    if (productId) {
-      shopify.toast.show("Product created");
-    }
-  }, [productId, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
-
-  return (
-    <Page>
-      <TitleBar title="Remix app template">
-        <button variant="primary" onClick={generateProduct}>
-          Generate a product
-        </button>
-      </TitleBar>
-      <BlockStack gap="500">
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="500">
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Congrats on creating a new Shopify app 🎉
-                  </Text>
-                  <Text variant="bodyMd" as="p">
-                    This embedded app template uses{" "}
-                    <Link
-                      url="https://shopify.dev/docs/apps/tools/app-bridge"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      App Bridge
-                    </Link>{" "}
-                    interface examples like an{" "}
-                    <Link url="/app/additional" removeUnderline>
-                      additional page in the app nav
-                    </Link>
-                    , as well as an{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      Admin GraphQL
-                    </Link>{" "}
-                    mutation demo, to provide a starting point for app
-                    development.
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingMd">
-                    Get started with products
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    Generate a product with GraphQL and get the JSON output for
-                    that product. Learn more about the{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      productCreate
-                    </Link>{" "}
-                    mutation in our API references.
-                  </Text>
-                </BlockStack>
-                <InlineStack gap="300">
-                  <Button loading={isLoading} onClick={generateProduct}>
-                    Generate a product
-                  </Button>
-                  {fetcher.data?.product && (
-                    <Button
-                      url={`shopify:admin/products/${productId}`}
-                      target="_blank"
-                      variant="plain"
-                    >
-                      View product
-                    </Button>
-                  )}
-                </InlineStack>
-                {fetcher.data?.product && (
-                  <>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productCreate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.product, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productVariantsBulkUpdate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.variant, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                  </>
-                )}
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-          <Layout.Section variant="oneThird">
-            <BlockStack gap="500">
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    App template specs
-                  </Text>
-                  <BlockStack gap="200">
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Framework
-                      </Text>
-                      <Link
-                        url="https://remix.run"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Remix
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Database
-                      </Text>
-                      <Link
-                        url="https://www.prisma.io/"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Prisma
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Interface
-                      </Text>
-                      <span>
-                        <Link
-                          url="https://polaris.shopify.com"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          Polaris
-                        </Link>
-                        {", "}
-                        <Link
-                          url="https://shopify.dev/docs/apps/tools/app-bridge"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          App Bridge
-                        </Link>
-                      </span>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        API
-                      </Text>
-                      <Link
-                        url="https://shopify.dev/docs/api/admin-graphql"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphQL API
-                      </Link>
-                    </InlineStack>
-                  </BlockStack>
-                </BlockStack>
-              </Card>
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Next steps
-                  </Text>
-                  <List>
-                    <List.Item>
-                      Build an{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/getting-started/build-app-example"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        {" "}
-                        example app
-                      </Link>{" "}
-                      to get started
-                    </List.Item>
-                    <List.Item>
-                      Explore Shopify’s API with{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphiQL
-                      </Link>
-                    </List.Item>
-                  </List>
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
-    </Page>
-  );
-}
-
-export async function createFunction(shopify) {
-  const query = `
-  query {
-    shopifyFunctions(first: 50) {
-      edges {
-        node {
-        app{
-        title
-        }
-        id
-        title
-        apiType
-        }
       }
     }
-  }
-`;
+  `;
+
   const response = await shopify.admin.graphql(query);
   const json = await response.json();
-  const productDiscountFunction = json?.data?.shopifyFunctions?.edges.find(
-    (edge) => edge.node.apiType === "product_discounts",
-  )?.node;
+  const products = json.data.products.edges.map((edge) => edge.node);
+  return { products };
+};
 
-  if (productDiscountFunction) {
-    const createAutomaticDiscountMutation = `#graphql
-  mutation discountAutomaticAppCreate($automaticAppDiscount: DiscountAutomaticAppInput!) {
-    discountAutomaticAppCreate(automaticAppDiscount: $automaticAppDiscount) {
-      automaticAppDiscount {
-        discountId
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-
-    const variables = {
-      automaticAppDiscount: {
-        title: "Automatic Discount Sale",
-        functionId: productDiscountFunction.id,
-        startsAt: "2025-04-01T00:00:00",
-      },
+export async function action({ request }) {
+  const formData = await request.formData();
+  const shopify = await authenticate.admin(request);
+  const productId = formData.get("productId");
+  const variantId = formData.get("variantId");
+  const quantity = parseInt(formData.get("quantity"), 10);
+  const percentage = parseFloat(formData.get("percentage"));
+  const saleMessage = formData.get("salemsg");
+  const storeUrl = shopify.session.shop;
+  if (!productId || !variantId || !quantity || !percentage || !saleMessage) {
+    return {
+      status: 400,
+      success: false,
+      error: "Missing required fields",
     };
-    await shopify.admin.graphql(createAutomaticDiscountMutation, {
-      variables,
-    });
   }
+
+  try {
+    const discountData = [
+      {
+        productId,
+        variantId,
+        quantity,
+        percentage,
+        saleMessage,
+        storeUrl,
+      },
+    ];
+    await addVariantMetafield(shopify, discountData);
+    const existingDiscount = await prismafindFirst(
+      variantId,
+      storeUrl,
+      productId,
+    );
+    if (existingDiscount) {
+      return {
+        status: 400,
+        success: false,
+        message: "Discount already exists!",
+      };
+    } else {
+      await prismaCreateDiscount(discountData);
+      return {
+        status: 200,
+        success: true,
+        message: "Discount added successfully!",
+      };
+    }
+  } catch (error) {
+    console.error("❌ Prisma error:", error);
+    return {
+      status: 500,
+      success: false,
+      error: "Error saving discount",
+    };
+  }
+}
+
+export default function Index() {
+  const formRef = useRef(null);
+  const { products } = useLoaderData();
+  const fetcher = useFetcher();
+  const [selectedProduct, setSelectedProduct] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState("");
+  const [variants, setVariants] = useState([]);
+  const [toastActive, setToastActive] = useState(false);
+  const [toastContent, setToastContent] = useState("");
+
+  useEffect(() => {
+    if (fetcher.data?.variants) {
+      setVariants(fetcher.data.variants);
+    }
+    if (fetcher.data?.message) {
+      formRef.current?.reset();
+      setSelectedProduct("");
+      setSelectedVariant("");
+      setVariants([]);
+    }
+    if (fetcher.data?.success) {
+      setToastContent(fetcher.data.message || "Discount added successfully!");
+      setToastActive(true);
+    } else if (fetcher.data?.message === "Discount already exists!") {
+      setToastContent(fetcher.data.message || "Discount already exists!");
+      setToastActive(true);
+    } else if (fetcher.data?.error) {
+      setToastContent(fetcher.data.error || "Something went wrong!");
+      setToastActive(true);
+    }
+  }, [fetcher.data]);
+
+  const productOptions = products.map((product) => ({
+    label: product.title,
+    value: product.id,
+  }));
+
+  const variantOptions = variants.map((variant) => ({
+    label: `${variant.title} - $${variant.price}`,
+    value: variant.id,
+  }));
+
+  const handleProductChange = (value) => {
+    setSelectedProduct(value);
+    setVariants([]);
+    setSelectedVariant("");
+    fetcher.load(`/get-variants?productId=${encodeURIComponent(value)}`);
+  };
+
+  const handleVariantChange = (value) => {
+    setSelectedVariant(value);
+  };
+
+  return (
+    <Frame>
+      {toastActive && (
+        <Toast
+          content={toastContent}
+          onDismiss={() => setToastActive(false)}
+          duration={2000}
+        />
+      )}
+      <Page>
+        <TitleBar title="Add Product Variant" />
+        <Layout>
+          <Layout.Section>
+            <Card sectioned title="Add Discount">
+              <fetcher.Form method="post" ref={formRef}>
+                <BlockStack gap="400">
+                  <Select
+                    label="Select a Product"
+                    name="productId"
+                    options={productOptions}
+                    onChange={handleProductChange}
+                    value={selectedProduct}
+                    placeholder="Select a product"
+                  />
+
+                  {/* Variant Select - re-rendered using key */}
+                  {variantOptions.length > 0 && (
+                    <Select
+                      key={selectedProduct} // force re-render on product change
+                      label="Select a Variant"
+                      name="variantId"
+                      options={variantOptions}
+                      onChange={handleVariantChange}
+                      value={selectedVariant}
+                      placeholder="Select a variant"
+                    />
+                  )}
+
+                  {/* Minimum Quantity */}
+                  <div className="form-group">
+                    <label htmlFor="quantity">Minimum quantity of items:</label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      id="quantity"
+                      required
+                      min={1}
+                      style={{ width: "100%", padding: "8px" }}
+                    />
+                  </div>
+
+                  {/* Discount Percentage */}
+                  <div className="form-group">
+                    <label htmlFor="percentage">Discount Percentage:</label>
+                    <input
+                      type="number"
+                      name="percentage"
+                      id="percentage"
+                      required
+                      min={1}
+                      max={100}
+                      style={{ width: "100%", padding: "8px" }}
+                    />
+                  </div>
+
+                  {/* Sale Message */}
+                  <div className="form-group">
+                    <label htmlFor="salemsg">Sale Message:</label>
+                    <textarea
+                      name="salemsg"
+                      id="salemsg"
+                      required
+                      rows={3}
+                      style={{ width: "100%", padding: "8px" }}
+                    ></textarea>
+                  </div>
+
+                  <div className="form-group">
+                    <button
+                      type="submit"
+                      disabled={fetcher.state === "submitting"}
+                      style={{
+                        backgroundColor:
+                          fetcher.state === "submitting"
+                            ? "#b3b9b7"
+                            : "#008060",
+                        color: fetcher.state === "submitting" ? "#000" : "#fff",
+                        padding: "10px 16px",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor:
+                          fetcher.state === "submitting"
+                            ? "not-allowed"
+                            : "pointer",
+                        minWidth: "140px",
+                      }}
+                    >
+                      {fetcher.state === "submitting"
+                        ? "Adding..."
+                        : "Add Discount"}
+                    </button>
+                  </div>
+                </BlockStack>
+              </fetcher.Form>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    </Frame>
+  );
 }
